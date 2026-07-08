@@ -1,0 +1,44 @@
+name: Codzienny scraper cen
+
+on:
+  schedule:
+    # Codziennie o 4:00 UTC = ok. 6:00 rano latem / 5:00 rano zimą czasu polskiego.
+    # Dzięki temu dane są gotowe z dużym zapasem przed rozpoczęciem pracy.
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+    # Pozwala odpalić workflow ręcznie z zakładki "Actions" w GitHubie — przydatne do testów,
+    # bez czekania do 4:00 rano.
+
+permissions:
+  contents: write   # bez tego workflow nie miałby prawa zapisać wyników z powrotem do repozytorium
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pobierz repozytorium
+        uses: actions/checkout@v4
+
+      - name: Ustaw Pythona
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Zainstaluj zależności
+        run: pip install -r requirements.txt
+
+      - name: Uruchom scraper
+        run: python scraper.py
+
+      - name: Przenieś dzisiejszy wynik do folderu z historią
+        run: |
+          mkdir -p wyniki
+          cp ceny_*.csv wyniki/
+
+      - name: Zapisz wyniki z powrotem do repozytorium
+        run: |
+          git config user.name "Robot cenowy"
+          git config user.email "actions@github.com"
+          git add wyniki/ dashboard_podglad.csv
+          git commit -m "Codzienna aktualizacja cen $(date +'%Y-%m-%d')" || echo "Brak zmian do zapisania — dzisiejszy wynik identyczny jak poprzedni."
+          git push
