@@ -96,6 +96,22 @@ soup_itemprop = BeautifulSoup(html_itemprop, "html.parser")
 sprawdz("cena_ze_znacznika_meta (itemprop='price', wariant Shoper)",
         cena_ze_znacznika_meta(soup_itemprop), 4796.00)
 
+# --- USTERKA #3 (Nautilus2): prawdziwa struktura current-price z Twojego pliku HTML ---
+html_current_price = """
+<html><body>
+<div class="product-price h5">
+  <link href="https://schema.org/InStock"/>
+  <meta content="PLN">
+  <div class="current-price">
+    <span content="9419">9&nbsp;419,00&nbsp;zł</span>
+  </div>
+</div>
+</body></html>
+"""
+soup_current_price = BeautifulSoup(html_current_price, "html.parser")
+sprawdz("cena_ze_znacznika_meta (div.current-price, prawdziwy HTML Nautilus2)",
+        cena_ze_znacznika_meta(soup_current_price), 9419.0)
+
 print(f"\n{testy_zaliczone} / {testy_wszystkie} testow zaliczonych.")
 if testy_zaliczone != testy_wszystkie:
     raise SystemExit(1)

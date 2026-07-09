@@ -31,6 +31,13 @@ from urllib.parse import urlparse
 import requests
 from bs4 import BeautifulSoup
 
+try:
+    from curl_cffi import requests as curl_requests
+    from curl_cffi.requests.impersonate import DEFAULT_CHROME
+    CURL_CFFI_DOSTEPNE = True
+except ImportError:
+    CURL_CFFI_DOSTEPNE = False
+
 # ---------------------------------------------------------------------------
 # Ustawienia ogólne
 # ---------------------------------------------------------------------------
@@ -49,7 +56,11 @@ HEADERS = {
         "image/webp,*/*;q=0.8"
     ),
     "Accept-Language": "pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7",
-    "Accept-Encoding": "gzip, deflate, br",
+    # UWAGA: celowo bez 'br' (Brotli) w Accept-Encoding — obiecywalibyśmy serwerowi
+    # obsługę kompresji, której bez dodatkowej biblioteki i tak nie umiemy rozpakować.
+    # To spowodowało prawdziwą regresję na AudioPlaza (serwer odpowiadał Brotli,
+    # a `requests` zwracał nieczytelny tekst zamiast strony).
+    "Accept-Encoding": "gzip, deflate",
     "Connection": "keep-alive",
     "Upgrade-Insecure-Requests": "1",
 }
@@ -138,6 +149,19 @@ def cena_ze_znacznika_meta(soup: BeautifulSoup) -> Optional[float]:
         if wynik is not None:
             return wynik
 
+    # Trzeci wzorzec — potwierdzony na żywym kodzie strony PrestaShop (Nautilus2,
+    # SalonyDenon): <div class="current-price"><span content="9419">...</span></div>.
+    # To ten sam atrybut, którego używa własny JavaScript sklepu do obliczania rat,
+    # więc jest równie niezawodny jak znacznik meta.
+    div_ceny = soup.find("div", class_="current-price")
+    if div_ceny:
+        element_z_cena = div_ceny.find(attrs={"content": True})
+        if element_z_cena:
+            try:
+                return float(element_z_cena["content"])
+            except ValueError:
+                pass
+
     return None
 
 
@@ -211,9 +235,11 @@ REGULY_TEKSTOWE = {
 
 def pobierz_z_ponawianiem(url: str) -> requests.Response:
     """
-    Próbuje pobrać stronę do LICZBA_PROB razy. Błędy 403/429/5xx bywają chwilowe
-    (np. serwer chwilowo podejrzliwy wobec częstych zapytań) — warto spróbować
-    ponownie, zanim uznamy sklep za trwale niedostępny.
+    Próbuje pobrać stronę zwykłym `requests` do LICZBA_PROB razy — to wystarcza
+    dla większości sklepów. Jeśli to się nie uda (np. sklep blokuje na podstawie
+    odcisku TLS, a nie tylko nagłówków — tak jak podejrzewamy w przypadku Nautilus2),
+    w ostatniej próbie sięgamy po curl_cffi, który naśladuje prawdziwą przeglądarkę
+    Chrome na poziomie szyfrowania. To często wystarcza tam, gdzie same nagłówki zawodzą.
     """
     ostatni_blad: Optional[Exception] = None
     for probe in range(1, LICZBA_PROB + 1):
@@ -225,6 +251,18 @@ def pobierz_z_ponawianiem(url: str) -> requests.Response:
             ostatni_blad = e
             if probe < LICZBA_PROB:
                 time.sleep(ODSTEP_MIEDZY_PROBAMI_S)
+
+    if CURL_CFFI_DOSTEPNE:
+        try:
+            odpowiedz = curl_requests.get(
+                url, headers=HEADERS, timeout=REQUEST_TIMEOUT_SECONDS,
+                impersonate=DEFAULT_CHROME,
+            )
+            odpowiedz.raise_for_status()
+            return odpowiedz  # type: ignore[return-value]
+        except Exception as e:
+            ostatni_blad = e
+
     raise ostatni_blad  # type: ignore[misc]
 
 
