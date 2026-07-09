@@ -329,10 +329,18 @@ def zapisz_wynik_dlugi(wyniki: list[WynikScrapingu], sciezka: str) -> None:
             writer.writerow(asdict(w))
 
 
+# Stała kolejność kolumn w dashboardzie — własny sklep zawsze pierwszy,
+# potem konkurenci. Jeśli kiedyś dojdzie kolejny sklep spoza tej listy,
+# ląduje na końcu automatycznie, żeby nic po cichu nie zniknęło z raportu.
+KOLEJNOSC_SKLEPOW = ["cyfrowedomy.pl", "AudioPlaza", "Q21", "Nautilus2", "SalonyDenon"]
+
+
 def zapisz_dashboard(wyniki: list[WynikScrapingu], sciezka: str) -> None:
     """Pivotuje długą listę wyników w tabelę: produkty w wierszach, sklepy w kolumnach."""
     produkty = sorted({w.product_name for w in wyniki})
-    sklepy = sorted({w.sklep for w in wyniki})
+    sklepy_obecne = {w.sklep for w in wyniki}
+    sklepy_dodatkowe = sorted(sklepy_obecne - set(KOLEJNOSC_SKLEPOW))
+    sklepy = [s for s in KOLEJNOSC_SKLEPOW if s in sklepy_obecne] + sklepy_dodatkowe
 
     with open(sciezka, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -345,6 +353,8 @@ def zapisz_dashboard(wyniki: list[WynikScrapingu], sciezka: str) -> None:
                     wiersz.append("—")
                 elif pasujace[0].cena_pln is not None:
                     wiersz.append(f"{pasujace[0].cena_pln:.2f}")
+                elif pasujace[0].status_scrapingu == "brak_w_ofercie":
+                    wiersz.append("x")
                 else:
                     wiersz.append(pasujace[0].status_scrapingu)
             writer.writerow(wiersz)
