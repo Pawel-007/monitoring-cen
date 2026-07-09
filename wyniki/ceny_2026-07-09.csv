@@ -1,0 +1,16 @@
+data,product_name,ean,sklep,typ_sklepu,url,cena_pln,status_scrapingu
+2026-07-09,Cambridge Audio EVO 150 SE,5055300423948,cyfrowedomy.pl,wlasny,https://cyfrowedomy.pl/pl/p/CAMBRIDGE-AUDIO-EVO-150-SE/907,0.0,ok (fallback - do weryfikacji)
+2026-07-09,Cambridge Audio EVO 150 SE,5055300423948,Q21,konkurent,https://www.q21.pl/cambridge-audio-evo-150-se.html,9580.0,ok (tekst)
+2026-07-09,Cambridge Audio EVO 150 SE,5055300423948,Nautilus2,konkurent,https://nautilus2.pl/odtwarzacze-all-in-one/38312-cambridge-audio-evo-150-se.html,,blad_pobierania: 403 Client Error: Forbidden for url: https://nautilus2.pl/odtwarzacze-all-in-one/38312-cambridge-audio-evo-150-se.html
+2026-07-09,Cambridge Audio EVO 150 SE,5055300423948,AudioPlaza,konkurent,https://audioplaza.pl/products/40608-cambridge-audio-evo-150-se-wzmacniacz-all-in-one-salon-poznan-wroclaw,9192.0,ok (tekst)
+2026-07-09,Cambridge Audio EVO 150 SE,5055300423948,SalonyDenon,konkurent,,,brak_w_ofercie
+2026-07-09,Marantz Cinema 60 Black,0747192138721,cyfrowedomy.pl,wlasny,https://cyfrowedomy.pl/pl/p/MARANTZ-CINEMA-60-Black/355,0.0,ok (fallback - do weryfikacji)
+2026-07-09,Marantz Cinema 60 Black,0747192138721,SalonyDenon,konkurent,https://www.salonydenon.pl/amplitunery-kina-domowego/amplituner-marantz-cinema-60.html,4199.0,ok (meta)
+2026-07-09,Marantz Cinema 60 Black,0747192138721,Q21,konkurent,https://www.q21.pl/marantz-cinema-60-czarny.html,4148.0,ok (tekst)
+2026-07-09,Marantz Cinema 60 Black,0747192138721,Nautilus2,konkurent,https://nautilus2.pl/amplitunery-kina-domowego/31732-marantz-cinema-60-czarny-0747192138721.html,,blad_pobierania: 403 Client Error: Forbidden for url: https://nautilus2.pl/amplitunery-kina-domowego/31732-marantz-cinema-60-czarny-0747192138721.html
+2026-07-09,Marantz Cinema 60 Black,0747192138721,AudioPlaza,konkurent,https://audioplaza.pl/products/36291-marantz-cinema-60-czarny-amplituner-kina-domowego-salon-poznan,4099.0,ok (tekst)
+2026-07-09,Monitor Audio Silver 7G 500 Black High Gloss,5060565776654,cyfrowedomy.pl,wlasny,https://cyfrowedomy.pl/pl/p/MONITOR-AUDIO-Silver-7G-500-Black-High-Gloss/1377,0.0,ok (fallback - do weryfikacji)
+2026-07-09,Monitor Audio Silver 7G 500 Black High Gloss,5060565776654,Q21,konkurent,https://www.q21.pl/monitor-audio-silver-500-7g-czarny-polysk.html,,niezgodny_ean (strona pokazuje 05060565776654)
+2026-07-09,Monitor Audio Silver 7G 500 Black High Gloss,5060565776654,Nautilus2,konkurent,https://nautilus2.pl/podlogowe/28574-monitor-audio-7g-silver-500-black-gloss-5060565776654.html,,blad_pobierania: 403 Client Error: Forbidden for url: https://nautilus2.pl/podlogowe/28574-monitor-audio-7g-silver-500-black-gloss-5060565776654.html
+2026-07-09,Monitor Audio Silver 7G 500 Black High Gloss,5060565776654,AudioPlaza,konkurent,https://audioplaza.pl/products/26842-monitor-audio-silver-500-high-gloss-black-czarny-polysk-kolumna-podlogowa-salon-poznan,5215.0,ok (tekst)
+2026-07-09,Monitor Audio Silver 7G 500 Black High Gloss,5060565776654,SalonyDenon,konkurent,,,brak_w_ofercie
