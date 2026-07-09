@@ -2,9 +2,13 @@ name: Codzienny scraper cen
 
 on:
   schedule:
-    # Codziennie o 4:00 UTC = ok. 6:00 rano latem / 5:00 rano zimą czasu polskiego.
-    # Dzięki temu dane są gotowe z dużym zapasem przed rozpoczęciem pracy.
-    - cron: '0 4 * * *'
+    # Codziennie o 20:00 UTC = 22:00 czasu polskiego (obecnie: czas letni, CEST, UTC+2).
+    # UWAGA: Polska zmienia czas na zimowy (CET, UTC+1) pod koniec października —
+    # od tego momentu ten harmonogram uruchomi się realnie o 23:00, a nie 22:00,
+    # bo GitHub Actions liczy zawsze w UTC i nie zna polskiej zmiany czasu.
+    # Żeby utrzymać dokładnie 22:00 przez cały rok, trzeba by ręcznie zmienić
+    # tę linię na '0 21 * * *' po przejściu na czas zimowy (i z powrotem na wiosnę).
+    - cron: '0 20 * * *'
   workflow_dispatch:
     # Pozwala odpalić workflow ręcznie z zakładki "Actions" w GitHubie — przydatne do testów,
     # bez czekania do 4:00 rano.
