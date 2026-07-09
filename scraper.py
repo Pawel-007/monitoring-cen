@@ -20,6 +20,7 @@ zescrapować ceny. Można go uruchomić lokalnie na własnym komputerze albo
 """
 
 import csv
+import json
 import re
 import sys
 import time
@@ -124,6 +125,47 @@ def wyciagnij_ean(tekst: str) -> Optional[str]:
 # ---------------------------------------------------------------------------
 # Strategia 1: znacznik meta (najbardziej niezawodna, gdy jest dostępna)
 # ---------------------------------------------------------------------------
+
+def cena_z_json_ld(soup: BeautifulSoup) -> Optional[float]:
+    """
+    Wiele nowoczesnych sklepów (m.in. WooCommerce, PrestaShop z wtyczką Yoast SEO)
+    publikuje dane produktu w formacie JSON-LD (schema.org) — ustrukturyzowanym
+    bloku danych przeznaczonym do czytania maszynowego przez Google i porównywarki.
+    To najbardziej wiarygodne źródło, bo nie wymaga zgadywania formatu tekstu —
+    sprawdzamy je w pierwszej kolejności.
+    """
+    for tag in soup.find_all("script", attrs={"type": "application/ld+json"}):
+        if not tag.string:
+            continue
+        try:
+            dane = json.loads(tag.string)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        cena = _szukaj_ceny_w_jsonld(dane)
+        if cena is not None:
+            return cena
+    return None
+
+
+def _szukaj_ceny_w_jsonld(wezel):
+    """Przeszukuje zagnieżdżoną strukturę JSON-LD w poszukiwaniu pierwszego pola 'price'."""
+    if isinstance(wezel, dict):
+        if "price" in wezel:
+            try:
+                return float(wezel["price"])
+            except (ValueError, TypeError):
+                pass
+        for wartosc in wezel.values():
+            wynik = _szukaj_ceny_w_jsonld(wartosc)
+            if wynik is not None:
+                return wynik
+    elif isinstance(wezel, list):
+        for element in wezel:
+            wynik = _szukaj_ceny_w_jsonld(element)
+            if wynik is not None:
+                return wynik
+    return None
+
 
 def cena_ze_znacznika_meta(soup: BeautifulSoup) -> Optional[float]:
     """
@@ -290,12 +332,17 @@ def zescrapuj_produkt(url: str, oczekiwany_ean: str) -> tuple[Optional[float], s
         if eany_rozne:
             return None, f"niezgodny_ean (strona pokazuje {znaleziony_ean})"
 
-    # Strategia 1: znacznik meta.
+    # Strategia 1: dane JSON-LD (schema.org) — najbardziej wiarygodne, gdy dostępne.
+    cena = cena_z_json_ld(soup)
+    if cena_wiarygodna(cena):
+        return cena, "ok (json-ld)"
+
+    # Strategia 2: znacznik meta.
     cena = cena_ze_znacznika_meta(soup)
     if cena_wiarygodna(cena):
         return cena, "ok (meta)"
 
-    # Strategia 2: reguła dopasowana do konkretnej domeny.
+    # Strategia 3: reguła dopasowana do konkretnej domeny.
     domena = urlparse(url).netloc.replace("www.", "")
     for fragment_domeny, funkcja in REGULY_TEKSTOWE.items():
         if fragment_domeny in domena:
@@ -304,7 +351,7 @@ def zescrapuj_produkt(url: str, oczekiwany_ean: str) -> tuple[Optional[float], s
                 return cena, "ok (tekst)"
             return None, "cena_nieznaleziona"
 
-    # Strategia 3: ogólny fallback dla nierozpoznanych domen (np. cyfrowedomy.pl).
+    # Strategia 4: ogólny fallback dla nierozpoznanych domen.
     cena = cena_ogolna_fallback(tekst_widoczny)
     if cena_wiarygodna(cena):
         return cena, "ok (fallback - do weryfikacji)"
@@ -332,7 +379,7 @@ def zapisz_wynik_dlugi(wyniki: list[WynikScrapingu], sciezka: str) -> None:
 # Stała kolejność kolumn w dashboardzie — własny sklep zawsze pierwszy,
 # potem konkurenci. Jeśli kiedyś dojdzie kolejny sklep spoza tej listy,
 # ląduje na końcu automatycznie, żeby nic po cichu nie zniknęło z raportu.
-KOLEJNOSC_SKLEPOW = ["cyfrowedomy.pl", "AudioPlaza", "Q21", "Nautilus2", "SalonyDenon"]
+KOLEJNOSC_SKLEPOW = ["cyfrowedomy.pl", "AudioPlaza", "AudioColor", "Q21", "Nautilus2", "SalonyDenon"]
 
 
 def zapisz_dashboard(wyniki: list[WynikScrapingu], sciezka: str) -> None:

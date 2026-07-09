@@ -10,6 +10,7 @@ from scraper import (
     polska_cena_na_float,
     wyciagnij_ean,
     cena_ze_znacznika_meta,
+    cena_z_json_ld,
     cena_wiarygodna,
     cena_q21,
     cena_nautilus2,
@@ -111,6 +112,21 @@ html_current_price = """
 soup_current_price = BeautifulSoup(html_current_price, "html.parser")
 sprawdz("cena_ze_znacznika_meta (div.current-price, prawdziwy HTML Nautilus2)",
         cena_ze_znacznika_meta(soup_current_price), 9419.0)
+
+# --- USTERKA/FUNKCJA #4 (AudioColor): dane JSON-LD, prawdziwa struktura -----
+html_json_ld = """
+<html><head>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Product","name":"Cambridge Audio EVO 150 SE",
+"brand":{"@type":"Brand","name":"Cambridge Audio"},
+"offers":{"@type":"Offer","priceCurrency":"PLN","price":"11490.00",
+"priceSpecification":[{"@type":"UnitPriceSpecification","price":"11490.00","priceCurrency":"PLN","validThrough":"2027-12-31"}],
+"seller":{"@type":"Organization","name":"Sklep Audio Color","url":"https://sklep.audiocolor.pl"}}}
+</script>
+</head></html>
+"""
+soup_json_ld = BeautifulSoup(html_json_ld, "html.parser")
+sprawdz("cena_z_json_ld (AudioColor, prawdziwa struktura)", cena_z_json_ld(soup_json_ld), 11490.00)
 
 print(f"\n{testy_zaliczone} / {testy_wszystkie} testow zaliczonych.")
 if testy_zaliczone != testy_wszystkie:
