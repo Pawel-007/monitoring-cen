@@ -30,6 +30,9 @@ jobs:
       - name: Uruchom scraper
         run: python scraper.py
 
+      - name: Wygeneruj stronę HTML z dashboardem (Klocek 5)
+        run: python generate_dashboard_html.py
+
       - name: Przenieś dzisiejszy wynik do folderu z historią
         run: |
           mkdir -p wyniki
@@ -39,6 +42,6 @@ jobs:
         run: |
           git config user.name "Robot cenowy"
           git config user.email "actions@github.com"
-          git add wyniki/ dashboard_podglad.csv
+          git add wyniki/ dashboard_podglad.csv docs/index.html
           git commit -m "Codzienna aktualizacja cen $(date +'%Y-%m-%d')" || echo "Brak zmian do zapisania — dzisiejszy wynik identyczny jak poprzedni."
           git push
