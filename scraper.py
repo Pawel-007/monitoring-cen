@@ -22,6 +22,7 @@ zescrapować ceny. Można go uruchomić lokalnie na własnym komputerze albo
 import csv
 import re
 import sys
+import time
 from dataclasses import dataclass, asdict
 from datetime import date
 from typing import Optional
@@ -35,15 +36,28 @@ from bs4 import BeautifulSoup
 # ---------------------------------------------------------------------------
 
 # Przedstawiamy się jako zwykła przeglądarka — bez tego część sklepów
-# od razu odmawia odpowiedzi.
+# od razu odmawia odpowiedzi. GitHub Actions łączy się z adresu IP centrum
+# danych, więc dokładamy więcej nagłówków niż zwykle, żeby wyglądać
+# maksymalnie naturalnie.
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-    )
+    ),
+    "Accept": (
+        "text/html,application/xhtml+xml,application/xml;q=0.9,"
+        "image/webp,*/*;q=0.8"
+    ),
+    "Accept-Language": "pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
 }
 
 REQUEST_TIMEOUT_SECONDS = 15
+LICZBA_PROB = 3           # ile razy próbujemy, zanim uznamy sklep za niedostępny
+ODSTEP_MIEDZY_PROBAMI_S = 4   # sekundy odczekania między kolejnymi próbami tego samego produktu
+ODSTEP_MIEDZY_PRODUKTAMI_S = 1.5  # drobna pauza między produktami — uprzejmość wobec serwera
 KATALOG_PLIK = "katalog_produktow_pilotaz.csv"
 WYNIK_DLUGI_PLIK = f"ceny_{date.today().isoformat()}.csv"
 WYNIK_DASHBOARD_PLIK = "dashboard_podglad.csv"
@@ -77,6 +91,15 @@ def polska_cena_na_float(tekst: str) -> Optional[float]:
         return None
 
 
+def cena_wiarygodna(cena: Optional[float]) -> bool:
+    """
+    Cena 0,00 zł prawie nigdy nie jest prawdziwą ceną produktu — zwykle to szum
+    złapany przypadkiem (np. 'raty 0%', 'dostawa 0,00 zł'). Traktujemy ją jako
+    brak wyniku, zamiast zapisywać mylącą wartość do dashboardu.
+    """
+    return cena is not None and cena > 0
+
+
 def wyciagnij_ean(tekst: str) -> Optional[str]:
     """
     Szuka w tekście strony numeru EAN. Obsługuje dwa spotkane warianty:
@@ -104,7 +127,17 @@ def cena_ze_znacznika_meta(soup: BeautifulSoup) -> Optional[float]:
         try:
             return float(tag["content"])
         except ValueError:
-            return None
+            pass
+
+    # Drugi, bardzo rozpowszechniony standard (schema.org microdata) — spotykany
+    # na wielu platformach polskich sklepów, m.in. części opartych o Shoper.
+    tag = soup.find(attrs={"itemprop": "price"})
+    if tag:
+        surowa_wartosc = tag.get("content") or tag.get_text(strip=True)
+        wynik = polska_cena_na_float(surowa_wartosc)
+        if wynik is not None:
+            return wynik
+
     return None
 
 
@@ -176,11 +209,29 @@ REGULY_TEKSTOWE = {
 # Główna funkcja scrapująca pojedynczy produkt
 # ---------------------------------------------------------------------------
 
+def pobierz_z_ponawianiem(url: str) -> requests.Response:
+    """
+    Próbuje pobrać stronę do LICZBA_PROB razy. Błędy 403/429/5xx bywają chwilowe
+    (np. serwer chwilowo podejrzliwy wobec częstych zapytań) — warto spróbować
+    ponownie, zanim uznamy sklep za trwale niedostępny.
+    """
+    ostatni_blad: Optional[Exception] = None
+    for probe in range(1, LICZBA_PROB + 1):
+        try:
+            odpowiedz = requests.get(url, headers=HEADERS, timeout=REQUEST_TIMEOUT_SECONDS)
+            odpowiedz.raise_for_status()
+            return odpowiedz
+        except requests.exceptions.RequestException as e:
+            ostatni_blad = e
+            if probe < LICZBA_PROB:
+                time.sleep(ODSTEP_MIEDZY_PROBAMI_S)
+    raise ostatni_blad  # type: ignore[misc]
+
+
 def zescrapuj_produkt(url: str, oczekiwany_ean: str) -> tuple[Optional[float], str]:
     """Zwraca (cena, status). Status wyjaśnia, co się stało, jeśli coś poszło nie tak."""
     try:
-        odpowiedz = requests.get(url, headers=HEADERS, timeout=REQUEST_TIMEOUT_SECONDS)
-        odpowiedz.raise_for_status()
+        odpowiedz = pobierz_z_ponawianiem(url)
     except requests.exceptions.RequestException as e:
         return None, f"blad_pobierania: {e}"
 
@@ -189,13 +240,21 @@ def zescrapuj_produkt(url: str, oczekiwany_ean: str) -> tuple[Optional[float], s
 
     # Sprawdzenie tożsamości produktu — jeśli EAN na stronie nie zgadza się
     # z katalogiem, wolimy zgłosić problem niż zapisać cenę złego produktu.
+    # Porównujemy jako liczby, nie jako tekst — niektóre sklepy (np. Q21) pokazują
+    # EAN z dodatkowym zerem wiodącym (05060565776654 zamiast 5060565776654),
+    # a to wciąż ten sam numer.
     znaleziony_ean = wyciagnij_ean(tekst_widoczny)
-    if znaleziony_ean and oczekiwany_ean and znaleziony_ean != oczekiwany_ean:
-        return None, f"niezgodny_ean (strona pokazuje {znaleziony_ean})"
+    if znaleziony_ean and oczekiwany_ean:
+        try:
+            eany_rozne = int(znaleziony_ean) != int(oczekiwany_ean)
+        except ValueError:
+            eany_rozne = znaleziony_ean != oczekiwany_ean
+        if eany_rozne:
+            return None, f"niezgodny_ean (strona pokazuje {znaleziony_ean})"
 
     # Strategia 1: znacznik meta.
     cena = cena_ze_znacznika_meta(soup)
-    if cena is not None:
+    if cena_wiarygodna(cena):
         return cena, "ok (meta)"
 
     # Strategia 2: reguła dopasowana do konkretnej domeny.
@@ -203,13 +262,13 @@ def zescrapuj_produkt(url: str, oczekiwany_ean: str) -> tuple[Optional[float], s
     for fragment_domeny, funkcja in REGULY_TEKSTOWE.items():
         if fragment_domeny in domena:
             cena = funkcja(tekst_widoczny)
-            if cena is not None:
+            if cena_wiarygodna(cena):
                 return cena, "ok (tekst)"
             return None, "cena_nieznaleziona"
 
     # Strategia 3: ogólny fallback dla nierozpoznanych domen (np. cyfrowedomy.pl).
     cena = cena_ogolna_fallback(tekst_widoczny)
-    if cena is not None:
+    if cena_wiarygodna(cena):
         return cena, "ok (fallback - do weryfikacji)"
 
     return None, "cena_nieznaleziona"
@@ -274,6 +333,7 @@ def main() -> None:
             sklep=wiersz["sklep"], typ_sklepu=wiersz["typ_sklepu"], url=wiersz["url"],
             cena_pln=cena, status_scrapingu=status,
         ))
+        time.sleep(ODSTEP_MIEDZY_PRODUKTAMI_S)
 
     zapisz_wynik_dlugi(wyniki, WYNIK_DLUGI_PLIK)
     zapisz_dashboard(wyniki, WYNIK_DASHBOARD_PLIK)
