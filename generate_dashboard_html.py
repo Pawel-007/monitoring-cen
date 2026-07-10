@@ -2,34 +2,58 @@
 """
 KLOCEK 5 — Poranny raport (strona HTML)
 =========================================
-Wejście:  dashboard_podglad.csv   (wygenerowany przez scraper.py — Klocek 2)
-Wyjście:  docs/index.html         (strona wyświetlana przez GitHub Pages)
+Wejście:  ceny_YYYY-MM-DD.csv    (plik długi wygenerowany przez scraper.py — ma URL każdego produktu)
+Wyjście:  docs/index.html        (strona wyświetlana przez GitHub Pages)
 
 Uruchamiany jako ostatni krok w workflow GitHub Actions, zaraz po scraper.py,
 żeby strona zawsze pokazywała najświeższe dane.
+
+Każda cena na stronie jest linkiem do konkretnej podstrony produktu w danym
+sklepie — pozwala to błyskawicznie zweryfikować "na żywo" każdą podejrzaną
+wartość, bez ręcznego szukania produktu na stronie sklepu.
 """
 
 import csv
+import glob
 from datetime import date
 
 WLASNY_SKLEP = "cyfrowedomy.pl"
-WEJSCIE = "dashboard_podglad.csv"
 WYJSCIE = "docs/index.html"
 
+# Ta sama kolejność, co w dashboard_podglad.csv — własny sklep zawsze pierwszy.
+KOLEJNOSC_SKLEPOW = ["cyfrowedomy.pl", "AudioPlaza", "AudioColor", "Q21", "Nautilus2", "SalonyDenon"]
 
-def wczytaj_dashboard(sciezka: str) -> tuple[list[str], list[list[str]]]:
+
+def znajdz_najnowszy_plik_cen() -> str:
+    """Scraper.py zapisuje plik z datą w nazwie (ceny_2026-07-10.csv) — bierzemy najświeższy."""
+    kandydaci = sorted(glob.glob("ceny_*.csv"))
+    if not kandydaci:
+        raise FileNotFoundError(
+            "Nie znaleziono żadnego pliku ceny_*.csv — uruchom najpierw scraper.py."
+        )
+    return kandydaci[-1]
+
+
+def wczytaj_dane(sciezka: str) -> list[dict]:
     with open(sciezka, newline="", encoding="utf-8") as f:
-        reader = csv.reader(f)
-        naglowek = next(reader)
-        wiersze = list(reader)
-    return naglowek, wiersze
+        return list(csv.DictReader(f))
 
 
-def komorka_na_liczbe(wartosc: str) -> float | None:
+def komorka_na_liczbe(wartosc: str):
     try:
         return float(wartosc)
-    except ValueError:
+    except (ValueError, TypeError):
         return None
+
+
+def zbuduj_macierz(wiersze: list[dict]):
+    """Układa listę wierszy (produkt, sklep, cena, url, status) w siatkę produkt x sklep."""
+    produkty = sorted({w["product_name"] for w in wiersze})
+    sklepy_obecne = {w["sklep"] for w in wiersze}
+    sklepy_dodatkowe = sorted(sklepy_obecne - set(KOLEJNOSC_SKLEPOW))
+    sklepy = [s for s in KOLEJNOSC_SKLEPOW if s in sklepy_obecne] + sklepy_dodatkowe
+    macierz = {(w["product_name"], w["sklep"]): w for w in wiersze}
+    return produkty, sklepy, macierz
 
 
 STYL_CSS = """
@@ -65,12 +89,13 @@ STYL_CSS = """
   td.brak { color: #b5b3ae; }
   td.blad { color: #f33333; font-size: 0.85rem; }
   tr:last-child td { border-bottom: none; }
+  td a { color: inherit; text-decoration: none; border-bottom: 1px dotted #999; }
+  td a:hover { border-bottom-style: solid; }
   .legenda { margin-top: 16px; font-size: 0.85rem; color: #6b6b68; }
 """
 
 
-def zbuduj_html(naglowek: list[str], wiersze: list[list[str]]) -> str:
-    sklepy = naglowek[1:]
+def zbuduj_html(produkty: list[str], sklepy: list[str], macierz: dict) -> str:
     dzis = date.today().strftime("%d.%m.%Y")
 
     naglowki_kolumn = "".join(
@@ -78,27 +103,48 @@ def zbuduj_html(naglowek: list[str], wiersze: list[list[str]]) -> str:
     )
 
     wiersze_html = []
-    for wiersz in wiersze:
-        produkt = wiersz[0]
-        wartosci = wiersz[1:]
-        ceny_liczbowe = [komorka_na_liczbe(v) for v in wartosci]
-        najnizsza = min((c for c in ceny_liczbowe if c is not None), default=None)
+    for produkt in produkty:
+        # Najpierw ustalamy najniższą cenę w wierszu (do podświetlenia).
+        ceny_w_wierszu = []
+        for sklep in sklepy:
+            wpis = macierz.get((produkt, sklep))
+            if wpis:
+                cena = komorka_na_liczbe(wpis.get("cena_pln"))
+                if cena is not None:
+                    ceny_w_wierszu.append(cena)
+        najnizsza = min(ceny_w_wierszu) if ceny_w_wierszu else None
 
         komorki = []
-        for sklep, wartosc, cena in zip(sklepy, wartosci, ceny_liczbowe):
+        for sklep in sklepy:
+            wpis = macierz.get((produkt, sklep))
             klasy = []
             if sklep == WLASNY_SKLEP:
                 klasy.append("wlasny")
+
+            if wpis is None:
+                komorki.append(f'<td class="{" ".join(klasy) or "brak"}">—</td>')
+                continue
+
+            cena = komorka_na_liczbe(wpis.get("cena_pln"))
+            url = (wpis.get("url") or "").strip()
+            status = wpis.get("status_scrapingu", "")
+
             if cena is not None:
                 if cena == najnizsza:
                     klasy.append("najtansza")
                 tresc = f"{cena:,.2f} zł".replace(",", " ").replace(".", ",", 1)
-            elif wartosc == "x":
+            elif status == "brak_w_ofercie":
                 klasy.append("brak")
                 tresc = "x"
             else:
                 klasy.append("blad")
                 tresc = "błąd"
+
+            # Cena albo błąd z dostępnym URL-em — owijamy w link, żeby dało się
+            # jednym kliknięciem zweryfikować wartość na żywo w sklepie.
+            if url:
+                tresc = f'<a href="{url}" target="_blank" rel="noopener noreferrer">{tresc}</a>'
+
             klasa_attr = f' class="{" ".join(klasy)}"' if klasy else ""
             komorki.append(f"<td{klasa_attr}>{tresc}</td>")
 
@@ -125,7 +171,8 @@ def zbuduj_html(naglowek: list[str], wiersze: list[list[str]]) -> str:
   <div class="legenda">
     szara kolumna — Twoja cena (cyfrowedomy.pl) &nbsp;•&nbsp;
     czerwona liczba — najniższa cena w wierszu &nbsp;•&nbsp;
-    x — sklep nie ma tego produktu w ofercie
+    x — sklep nie ma tego produktu w ofercie &nbsp;•&nbsp;
+    kliknij cenę, żeby zweryfikować ją na żywo w sklepie
   </div>
 </div>
 </body>
@@ -134,13 +181,15 @@ def zbuduj_html(naglowek: list[str], wiersze: list[list[str]]) -> str:
 
 
 def main() -> None:
-    naglowek, wiersze = wczytaj_dashboard(WEJSCIE)
-    html = zbuduj_html(naglowek, wiersze)
+    plik_wejsciowy = znajdz_najnowszy_plik_cen()
+    wiersze = wczytaj_dane(plik_wejsciowy)
+    produkty, sklepy, macierz = zbuduj_macierz(wiersze)
+    html = zbuduj_html(produkty, sklepy, macierz)
     import os
     os.makedirs("docs", exist_ok=True)
     with open(WYJSCIE, "w", encoding="utf-8") as f:
         f.write(html)
-    print(f"Zapisano {WYJSCIE}")
+    print(f"Zapisano {WYJSCIE} na podstawie {plik_wejsciowy}")
 
 
 if __name__ == "__main__":
