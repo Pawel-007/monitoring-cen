@@ -14,9 +14,6 @@ from scraper import (
     cena_ze_znacznika_meta,
     cena_z_json_ld,
     cena_wiarygodna,
-    cena_q21,
-    cena_nautilus2,
-    cena_audioplaza,
     zescrapuj_produkt,
 )
 
@@ -37,24 +34,68 @@ def sprawdz(nazwa: str, otrzymano, oczekiwano) -> None:
 sprawdz("polska_cena_na_float - z groszami", polska_cena_na_float("11 490,00"), 11490.00)
 sprawdz("polska_cena_na_float - bez grosza", polska_cena_na_float("9 192"), 9192.0)
 
-# --- Q21: prawdziwy fragment strony Cambridge Audio EVO 150 SE ------------
-tekst_q21 = (
-    "1 2 3 ... 1000 szt. - 11 490,00 zł 9 580,00 zł / szt. - dodaj do koszyka - "
-    "Wzmacniacz zintegrowany ze streamerem Cambridge Audio Evo 150 SE"
-)
-sprawdz("cena_q21 (Cambridge EVO 150 SE)", cena_q21(tekst_q21), 9580.00)
+# --- Q21: itemprop="price" znaleziony w PRAWDZIWYM kodzie strony (Marantz Cinema 60) ---
+html_q21_itemprop = """
+<html><body>
+<meta itemprop="url" content="https://www.q21.pl/marantz-cinema-60-czarny.html" />
+<meta itemprop="priceValidUntil" content="2026-07-24" />
+<meta itemprop="price" content="4148.00" />
+</body></html>
+"""
+soup_q21 = BeautifulSoup(html_q21_itemprop, "html.parser")
+sprawdz("cena_ze_znacznika_meta (Q21, prawdziwy itemprop='price')",
+        cena_ze_znacznika_meta(soup_q21), 4148.00)
 
-# --- Nautilus2: prawdziwy fragment strony Monitor Audio Silver 500 --------
-tekst_nautilus2 = (
-    "Monitor Audio 7G Silver 500 Black Gloss 4 995,00 zł Brutto PrestaShop Checkout"
-)
-sprawdz("cena_nautilus2 (Monitor Audio Silver 500)", cena_nautilus2(tekst_nautilus2), 4995.00)
+# --- Nautilus2: prawdziwa struktura JSON-LD (Marantz Cinema 60) -----------
+html_json_ld_nautilus2 = """
+<html><head>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Product","name":"Marantz CINEMA 60 Czarny",
+"offers":{"availability":"https://schema.org/InStock","price":"4199.00","priceCurrency":"PLN",
+"url":"https://nautilus2.pl/amplitunery-kina-domowego/31732-marantz-cinema-60-czarny-0747192138721.html"}}
+</script>
+</head></html>
+"""
+soup_nautilus2_ld = BeautifulSoup(html_json_ld_nautilus2, "html.parser")
+sprawdz("cena_z_json_ld (Nautilus2, prawdziwa struktura)",
+        cena_z_json_ld(soup_nautilus2_ld), 4199.00)
 
-# --- AudioPlaza: prawdziwy fragment strony Cambridge Audio EVO 150 SE -----
-tekst_audioplaza = (
-    "Autoryzowany dealer 9 192 zł 11 490 zł Najniższa cena z 30 dni: 9 192 zł DO KOSZYKA"
-)
-sprawdz("cena_audioplaza (Cambridge EVO 150 SE)", cena_audioplaza(tekst_audioplaza), 9192.0)
+# --- SalonyDenon: PUŁAPKA wariantów kolorystycznych w jednym bloku JSON-LD ---
+# Prawdziwa struktura: jeden blok JSON-LD opisuje NARAZ dwa warianty kolorystyczne
+# (Silver-Gold i Czarny). Gdy obie ceny są takie same — ufamy wynikowi.
+html_warianty_zgodne = """
+<html><head>
+<script type="application/ld+json">
+{"@type":"Product","name":"Marantz Cinema 60",
+"hasVariant":[
+  {"color":"Silver-gold","offers":{"@type":"Offer","price":"4199","priceCurrency":"PLN"}},
+  {"color":"Czarny","offers":{"@type":"Offer","price":"4199","priceCurrency":"PLN"}}
+]}
+</script>
+</head></html>
+"""
+soup_zgodne = BeautifulSoup(html_warianty_zgodne, "html.parser")
+sprawdz("cena_z_json_ld (SalonyDenon, warianty ZGODNE co do ceny -> ufamy)",
+        cena_z_json_ld(soup_zgodne), 4199.0)
+
+# Gdyby warianty miały RÓŻNE ceny — nie zgadujemy, zwracamy None zamiast złapać
+# przypadkiem cenę niewłaściwego koloru.
+html_warianty_rozne = """
+<html><head>
+<script type="application/ld+json">
+{"@type":"Product","name":"Przykladowy produkt z dwoma cenami wariantow",
+"hasVariant":[
+  {"color":"Silver-gold","offers":{"@type":"Offer","price":"4199","priceCurrency":"PLN"}},
+  {"color":"Czarny","offers":{"@type":"Offer","price":"4599","priceCurrency":"PLN"}}
+]}
+</script>
+</head></html>
+"""
+soup_rozne = BeautifulSoup(html_warianty_rozne, "html.parser")
+sprawdz("cena_z_json_ld (warianty RÓŻNE co do ceny -> None, nie zgadujemy)",
+        cena_z_json_ld(soup_rozne), None)
+
+# --- AudioPlaza: nie ma już dedykowanej reguły tekstowej — patrz test JSON-LD niżej ---
 
 # --- SalonyDenon: prawdziwy znacznik meta z Marantz Cinema 60 -------------
 html_salonydenon = """
@@ -141,6 +182,21 @@ with patch("scraper.pobierz_z_ponawianiem", side_effect=UdawanyBladCurlCffi("HTT
     cena, status = zescrapuj_produkt("https://nautilus2.pl/przyklad.html", "0000000000000")
     sprawdz("zescrapuj_produkt nie wywala się na błędzie spoza requests (bug z GH Actions)",
             (cena, status.startswith("blad_pobierania")), (None, True))
+
+# --- AudioPlaza: ta sama strategia JSON-LD, ale cena jako liczba, nie tekst ----
+html_json_ld_audioplaza = """
+<html><head>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Product","name":"Cambridge Audio EVO 150 SE",
+"offers":{"@type":"Offer","priceCurrency":"PLN","price":9192.0,"itemCondition":"http://schema.org/NewCondition",
+"availability":"http://schema.org/InStock","priceValidUntil":"2027-07-10"},
+"brand":{"@type":"http://schema.org/Brand","name":"Cambridge Audio"}}
+</script>
+</head></html>
+"""
+soup_json_ld_audioplaza = BeautifulSoup(html_json_ld_audioplaza, "html.parser")
+sprawdz("cena_z_json_ld (AudioPlaza, cena jako liczba JSON, nie tekst)",
+        cena_z_json_ld(soup_json_ld_audioplaza), 9192.0)
 
 print(f"\n{testy_zaliczone} / {testy_wszystkie} testow zaliczonych.")
 if testy_zaliczone != testy_wszystkie:

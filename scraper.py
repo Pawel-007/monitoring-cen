@@ -133,6 +133,12 @@ def cena_z_json_ld(soup: BeautifulSoup) -> Optional[float]:
     bloku danych przeznaczonym do czytania maszynowego przez Google i porównywarki.
     To najbardziej wiarygodne źródło, bo nie wymaga zgadywania formatu tekstu —
     sprawdzamy je w pierwszej kolejności.
+
+    UWAGA: niektóre sklepy (np. SalonyDenon) w jednym bloku JSON-LD opisują od razu
+    WSZYSTKIE warianty kolorystyczne produktu, każdy z osobną ceną. Jeśli w jednym
+    bloku znajdziemy różne ceny, nie zgadujemy, który wariant jest właściwy —
+    wolimy oddać pole innej, bardziej precyzyjnej strategii, niż zapisać cenę
+    niewłaściwego koloru.
     """
     for tag in soup.find_all("script", attrs={"type": "application/ld+json"}):
         if not tag.string:
@@ -141,30 +147,30 @@ def cena_z_json_ld(soup: BeautifulSoup) -> Optional[float]:
             dane = json.loads(tag.string)
         except (json.JSONDecodeError, TypeError):
             continue
-        cena = _szukaj_ceny_w_jsonld(dane)
-        if cena is not None:
-            return cena
+        znalezione_ceny: list[float] = []
+        _zbierz_ceny_z_jsonld(dane, znalezione_ceny)
+        unikalne_ceny = set(znalezione_ceny)
+        if len(unikalne_ceny) == 1:
+            return znalezione_ceny[0]
+        # len == 0: nic nie znaleziono w tym bloku, próbujemy kolejnego.
+        # len > 1: niejednoznaczne (różne warianty) — też próbujemy kolejnego bloku,
+        # a jeśli żaden się nie rozstrzygnie, funkcja zwróci None.
     return None
 
 
-def _szukaj_ceny_w_jsonld(wezel):
-    """Przeszukuje zagnieżdżoną strukturę JSON-LD w poszukiwaniu pierwszego pola 'price'."""
+def _zbierz_ceny_z_jsonld(wezel, wynik: list) -> None:
+    """Przeszukuje zagnieżdżoną strukturę JSON-LD, zbierając WSZYSTKIE pola 'price'."""
     if isinstance(wezel, dict):
         if "price" in wezel:
             try:
-                return float(wezel["price"])
+                wynik.append(float(wezel["price"]))
             except (ValueError, TypeError):
                 pass
         for wartosc in wezel.values():
-            wynik = _szukaj_ceny_w_jsonld(wartosc)
-            if wynik is not None:
-                return wynik
+            _zbierz_ceny_z_jsonld(wartosc, wynik)
     elif isinstance(wezel, list):
         for element in wezel:
-            wynik = _szukaj_ceny_w_jsonld(element)
-            if wynik is not None:
-                return wynik
-    return None
+            _zbierz_ceny_z_jsonld(element, wynik)
 
 
 def cena_ze_znacznika_meta(soup: BeautifulSoup) -> Optional[float]:
@@ -211,46 +217,6 @@ def cena_ze_znacznika_meta(soup: BeautifulSoup) -> Optional[float]:
 # Strategia 2: wzorce tekstowe dopasowane do konkretnego sklepu
 # ---------------------------------------------------------------------------
 
-def cena_q21(tekst_widoczny: str) -> Optional[float]:
-    """
-    Q21 (platforma SOTESHOP) pokazuje cenę jako zwykły tekst, np.:
-    '11 490,00 zł 9 580,00 zł / szt.'
-    Druga liczba (bliżej '/ szt.') to cena aktualna.
-    """
-    dopasowania = re.findall(r"(\d[\d\s\xa0]*,\d{2})\s*zł", tekst_widoczny)
-    if not dopasowania:
-        return None
-    # Bierzemy ostatnią cenę widoczną tuż przed "/ szt." — to ta faktycznie płacona.
-    return polska_cena_na_float(dopasowania[-1])
-
-
-def cena_nautilus2(tekst_widoczny: str) -> Optional[float]:
-    """
-    Nautilus2 (PrestaShop) pokazuje cenę zaraz po tytule, tuż przed słowem 'Brutto':
-    '4 995,00 zł  Brutto'
-    """
-    dopasowanie = re.search(r"(\d[\d\s\xa0]*,\d{2})\s*zł\s*Brutto", tekst_widoczny)
-    if dopasowanie:
-        return polska_cena_na_float(dopasowanie.group(1))
-    return None
-
-
-def cena_audioplaza(tekst_widoczny: str) -> Optional[float]:
-    """
-    AudioPlaza (własna platforma) pokazuje ceny BEZ grosza, np.:
-    '9 192 zł  11 490 zł  Najniższa cena z 30 dni: 9 192 zł'
-    Najpewniejszym punktem odniesienia jest etykieta "Najniższa cena z 30 dni".
-    """
-    dopasowanie = re.search(r"Najniższa cena z 30 dni:\s*(\d[\d\s\xa0]*)\s*zł", tekst_widoczny)
-    if dopasowanie:
-        return polska_cena_na_float(dopasowanie.group(1))
-    # Fallback: pierwsza liczba z "zł" na stronie (mniej pewne).
-    dopasowanie = re.search(r"(\d[\d\s\xa0]*)\s*zł", tekst_widoczny)
-    if dopasowanie:
-        return polska_cena_na_float(dopasowanie.group(1))
-    return None
-
-
 def cena_ogolna_fallback(tekst_widoczny: str) -> Optional[float]:
     """
     Ostatnia deska ratunku dla sklepów bez dedykowanej reguły (np. cyfrowedomy.pl,
@@ -264,10 +230,13 @@ def cena_ogolna_fallback(tekst_widoczny: str) -> Optional[float]:
 
 
 # Mapa: fragment domeny -> funkcja parsująca tekst widoczny na stronie.
-REGULY_TEKSTOWE = {
-    "q21.pl": cena_q21,
-    "nautilus2.pl": cena_nautilus2,
-    "audioplaza.pl": cena_audioplaza,
+# Uwaga: AudioPlaza celowo tu nie występuje — JSON-LD (sprawdzany wcześniej)
+# w pełni pokrywa ten sklep, więc dedykowana reguła tekstowa byłaby martwym kodem.
+REGULY_TEKSTOWE: dict = {
+    # Obecnie pusty — wszystkie sześć sklepów jest pokrytych przez JSON-LD,
+    # znaczniki meta albo strukturę div.current-price. Mechanizm zostaje
+    # w kodzie na wypadek przyszłego sklepu, który nie da się złapać żadną
+    # z tych trzech metod i będzie wymagał własnej reguły tekstowej.
 }
 
 
