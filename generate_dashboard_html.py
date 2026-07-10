@@ -155,12 +155,12 @@ def zbuduj_html(produkty: list[str], sklepy: list[str], macierz: dict) -> str:
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Monitoring cen — cyfrowedomy</title>
+<title>Monitoring cen — ACP</title>
 <style>{STYL_CSS}</style>
 </head>
 <body>
 <div class="wrapper">
-  <h1>Monitoring cen — cyfrowedomy</h1>
+  <h1>Monitoring cen — ACP</h1>
   <div class="aktualizacja">Ostatnia aktualizacja: {dzis}</div>
   <table>
     <thead><tr><th>Produkt</th>{naglowki_kolumn}</tr></thead>
