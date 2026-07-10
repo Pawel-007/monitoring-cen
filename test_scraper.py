@@ -4,6 +4,8 @@ podczas zwiadu po pięciu sklepach. Nie łączy się z internetem — sprawdza
 tylko, czy funkcje poprawnie odczytują cenę z tekstu, który już widzieliśmy.
 """
 
+from unittest.mock import patch
+
 from bs4 import BeautifulSoup
 
 from scraper import (
@@ -15,6 +17,7 @@ from scraper import (
     cena_q21,
     cena_nautilus2,
     cena_audioplaza,
+    zescrapuj_produkt,
 )
 
 testy_zaliczone = 0
@@ -127,6 +130,17 @@ html_json_ld = """
 """
 soup_json_ld = BeautifulSoup(html_json_ld, "html.parser")
 sprawdz("cena_z_json_ld (AudioColor, prawdziwa struktura)", cena_z_json_ld(soup_json_ld), 11490.00)
+
+# --- USTERKA #5 (awaria z prawdziwego uruchomienia): błąd spoza requests.exceptions ---
+class UdawanyBladCurlCffi(Exception):
+    """Odtwarza curl_cffi.requests.exceptions.HTTPError — wyjątek spoza hierarchii requests."""
+    pass
+
+
+with patch("scraper.pobierz_z_ponawianiem", side_effect=UdawanyBladCurlCffi("HTTP Error 500")):
+    cena, status = zescrapuj_produkt("https://nautilus2.pl/przyklad.html", "0000000000000")
+    sprawdz("zescrapuj_produkt nie wywala się na błędzie spoza requests (bug z GH Actions)",
+            (cena, status.startswith("blad_pobierania")), (None, True))
 
 print(f"\n{testy_zaliczone} / {testy_wszystkie} testow zaliczonych.")
 if testy_zaliczone != testy_wszystkie:

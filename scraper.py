@@ -312,7 +312,12 @@ def zescrapuj_produkt(url: str, oczekiwany_ean: str) -> tuple[Optional[float], s
     """Zwraca (cena, status). Status wyjaśnia, co się stało, jeśli coś poszło nie tak."""
     try:
         odpowiedz = pobierz_z_ponawianiem(url)
-    except requests.exceptions.RequestException as e:
+    except Exception as e:
+        # Celowo szerokie 'Exception', nie tylko requests.exceptions.RequestException —
+        # pobierz_z_ponawianiem() w ostatniej próbie sięga po curl_cffi, który rzuca
+        # WŁASNY, osobny typ błędu (curl_cffi.requests.exceptions.HTTPError), niezwiązany
+        # z biblioteką requests. Wąskie 'except' nie łapało tego wyjątku, przez co jeden
+        # niedostępny sklep wywalał cały skrypt zamiast zostać zgłoszony jako błąd wiersza.
         return None, f"blad_pobierania: {e}"
 
     soup = BeautifulSoup(odpowiedz.text, "html.parser")
