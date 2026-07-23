@@ -1,0 +1,19 @@
+data,product_name,ean,sklep,typ_sklepu,url,cena_pln,status_scrapingu
+2026-07-23,Cambridge Audio EVO 150 SE,5055300423948,cyfrowedomy.pl,wlasny,https://cyfrowedomy.pl/pl/p/CAMBRIDGE-AUDIO-EVO-150-SE/907,9990.0,ok (meta)
+2026-07-23,Cambridge Audio EVO 150 SE,5055300423948,Q21,konkurent,https://www.q21.pl/cambridge-audio-evo-150-se.html,9990.0,ok (meta)
+2026-07-23,Cambridge Audio EVO 150 SE,5055300423948,Nautilus2,konkurent,https://nautilus2.pl/odtwarzacze-all-in-one/38312-cambridge-audio-evo-150-se.html,9990.0,ok (json-ld)
+2026-07-23,Cambridge Audio EVO 150 SE,5055300423948,AudioPlaza,konkurent,https://audioplaza.pl/products/40608-cambridge-audio-evo-150-se-wzmacniacz-all-in-one-salon-poznan-wroclaw,9990.0,ok (json-ld)
+2026-07-23,Cambridge Audio EVO 150 SE,5055300423948,SalonyDenon,konkurent,,,brak_w_ofercie
+2026-07-23,Cambridge Audio EVO 150 SE,5055300423948,AudioColor,konkurent,https://sklep.audiocolor.pl/produkt/cambridge-audio-evo-150-se-system-stereo-2x150w-mqa-tidal/,11490.0,ok (json-ld)
+2026-07-23,Marantz Cinema 60 Black,0747192138721,cyfrowedomy.pl,wlasny,https://cyfrowedomy.pl/pl/p/MARANTZ-CINEMA-60-Black/355,4199.0,ok (meta)
+2026-07-23,Marantz Cinema 60 Black,0747192138721,SalonyDenon,konkurent,https://www.salonydenon.pl/amplitunery-kina-domowego/amplituner-marantz-cinema-60.html,4199.0,ok (json-ld)
+2026-07-23,Marantz Cinema 60 Black,0747192138721,Q21,konkurent,https://www.q21.pl/marantz-cinema-60-czarny.html,4148.0,ok (meta)
+2026-07-23,Marantz Cinema 60 Black,0747192138721,Nautilus2,konkurent,https://nautilus2.pl/amplitunery-kina-domowego/31732-marantz-cinema-60-czarny-0747192138721.html,4199.0,ok (json-ld)
+2026-07-23,Marantz Cinema 60 Black,0747192138721,AudioPlaza,konkurent,https://audioplaza.pl/products/36291-marantz-cinema-60-czarny-amplituner-kina-domowego-salon-poznan,4099.0,ok (json-ld)
+2026-07-23,Marantz Cinema 60 Black,0747192138721,AudioColor,konkurent,https://sklep.audiocolor.pl/sklep/marki/marantz/amplitunery-maratz/marantz-cinema-60-amplituner-7-2-8k-60hz-z-alexa-airplay-i-heos/,4147.0,ok (json-ld)
+2026-07-23,Monitor Audio Silver 7G 500 Black High Gloss,5060565776654,cyfrowedomy.pl,wlasny,https://cyfrowedomy.pl/pl/p/MONITOR-AUDIO-Silver-7G-500-Black-High-Gloss/1377,4990.0,ok (meta)
+2026-07-23,Monitor Audio Silver 7G 500 Black High Gloss,5060565776654,Q21,konkurent,https://www.q21.pl/monitor-audio-silver-500-7g-czarny-polysk.html,4995.0,ok (meta)
+2026-07-23,Monitor Audio Silver 7G 500 Black High Gloss,5060565776654,Nautilus2,konkurent,https://nautilus2.pl/podlogowe/28574-monitor-audio-7g-silver-500-black-gloss-5060565776654.html,4995.0,ok (json-ld)
+2026-07-23,Monitor Audio Silver 7G 500 Black High Gloss,5060565776654,AudioPlaza,konkurent,https://audioplaza.pl/products/26842-monitor-audio-silver-500-high-gloss-black-czarny-polysk-kolumna-podlogowa-salon-poznan,5215.0,ok (json-ld)
+2026-07-23,Monitor Audio Silver 7G 500 Black High Gloss,5060565776654,SalonyDenon,konkurent,,,brak_w_ofercie
+2026-07-23,Monitor Audio Silver 7G 500 Black High Gloss,5060565776654,AudioColor,konkurent,https://sklep.audiocolor.pl/produkt/monitor-audio-silver-7g-500-kolumna-podlogowa-para/,5995.0,ok (json-ld)
