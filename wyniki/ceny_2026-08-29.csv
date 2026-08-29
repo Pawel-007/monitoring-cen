@@ -1,6 +1,6 @@
 data,product_name,ean,sklep,typ_sklepu,url,cena_pln,status_scrapingu
 2026-08-29,Cambridge Audio EVO 150 SE,5055300423948,cyfrowedomy.pl,wlasny,https://cyfrowedomy.pl/pl/p/CAMBRIDGE-AUDIO-EVO-150-SE/907,9990.0,ok (meta)
-2026-08-29,Cambridge Audio EVO 150 SE,5055300423948,Q21,konkurent,https://www.q21.pl/cambridge-audio-evo-150-se.html,9590.0,ok (meta)
+2026-08-29,Cambridge Audio EVO 150 SE,5055300423948,Q21,konkurent,https://www.q21.pl/cambridge-audio-evo-150-se.html,9110.5,ok (meta)
 2026-08-29,Cambridge Audio EVO 150 SE,5055300423948,Nautilus2,konkurent,https://nautilus2.pl/odtwarzacze-all-in-one/38312-cambridge-audio-evo-150-se.html,9990.0,ok (json-ld)
 2026-08-29,Cambridge Audio EVO 150 SE,5055300423948,AudioPlaza,konkurent,https://audioplaza.pl/products/40608-cambridge-audio-evo-150-se-wzmacniacz-all-in-one-salon-poznan-wroclaw,,blad_pobierania: HTTP Error 403: 
 2026-08-29,Cambridge Audio EVO 150 SE,5055300423948,SalonyDenon,konkurent,,,brak_w_ofercie
